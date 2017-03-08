@@ -90,7 +90,7 @@ import org.apache.beam.sdk.values.PDone;
  *
  * <p>For example:
  * <pre>{@code
- * // A simple Write to a local file (only runs locally):
+ * // A simple Write to a local file (only ruegyns locally):
  * PCollection<String> lines = ...;
  * lines.apply(TextIO.Write.to("/path/to/file.txt"));
  *

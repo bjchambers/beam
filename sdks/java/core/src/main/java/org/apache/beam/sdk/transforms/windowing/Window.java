@@ -479,7 +479,8 @@ public class Window {
             .setWindowingStrategyInternal(outputStrategy);
       } else {
         // This is the AssignWindows primitive
-        return input.apply(new Assign<T>(outputStrategy));
+        return input.apply(new Assign<T>(
+            windowFn, trigger, mode, allowedLateness, closingBehavior, outputTimeFn));
       }
     }
 
@@ -487,6 +488,8 @@ public class Window {
     public void populateDisplayData(DisplayData.Builder builder) {
       super.populateDisplayData(builder);
 
+      // This could use diffWindowingStrategy, but we don't know the input at this point, so we
+      // instead rely on what was explicitly set.
       if (windowFn != null) {
         builder
             .add(DisplayData.item("windowFn", windowFn.getClass())
@@ -532,30 +535,78 @@ public class Window {
     }
   }
 
-
   /**
    * A Primitive {@link PTransform} that assigns windows to elements based on a {@link WindowFn}.
    */
   public static class Assign<T> extends PTransform<PCollection<T>, PCollection<T>> {
-    private final WindowingStrategy<T, ?> updatedStrategy;
+
+    private final WindowFn<? super T, ?> windowFn;
+    @Nullable private final Trigger trigger;
+    @Nullable private final AccumulationMode mode;
+    @Nullable private final Duration allowedLateness;
+    @Nullable private final ClosingBehavior closingBehavior;
+    @Nullable private final OutputTimeFn<?> outputTimeFn;
 
     /**
      * Create a new {@link Assign} where the output is windowed with the updated {@link
      * WindowingStrategy}. Windows should be assigned using the {@link WindowFn} returned by
      * {@link #getWindowFn()}.
      */
-    private Assign(WindowingStrategy updatedStrategy) {
-      this.updatedStrategy = updatedStrategy;
+    private Assign(
+        WindowFn<? super T, ?> windowFn,
+        @Nullable Trigger trigger,
+        @Nullable AccumulationMode mode,
+        @Nullable Duration allowedLateness,
+        ClosingBehavior behavior,
+        @Nullable OutputTimeFn<?> outputTimeFn) {
+      this.windowFn = windowFn;
+      this.trigger = trigger;
+      this.mode = mode;
+      this.allowedLateness = allowedLateness;
+      this.closingBehavior = behavior;
+      this.outputTimeFn = outputTimeFn;
     }
 
     @Override
     public PCollection<T> expand(PCollection<T> input) {
       return PCollection.createPrimitiveOutputInternal(
-          input.getPipeline(), updatedStrategy, input.isBounded());
+          input.getPipeline(),
+          getOutputStrategyInternal(input.getWindowingStrategy()),
+          input.isBounded());
     }
 
-    public WindowFn<T, ?> getWindowFn() {
-      return updatedStrategy.getWindowFn();
+    public WindowFn<? super T, ?> getWindowFn() {
+      return windowFn;
+    }
+
+    /**
+     * Get the output strategy of this {@link Window.Bound Window PTransform}. For internal use
+     * only.
+     */
+    // Rawtype cast of OutputTimeFn cannot be eliminated with intermediate variable, as it is
+    // casting between wildcards
+    private WindowingStrategy<?, ?> getOutputStrategyInternal(
+        WindowingStrategy<?, ?> inputStrategy) {
+      WindowingStrategy<?, ?> result = inputStrategy;
+      if (windowFn != null) {
+        result = result.withWindowFn(windowFn);
+      }
+      if (trigger != null) {
+        result = result.withTrigger(trigger);
+      }
+      if (mode != null) {
+        result = result.withMode(mode);
+      }
+      if (allowedLateness != null) {
+        result = result.withAllowedLateness(allowedLateness);
+      }
+      if (closingBehavior != null) {
+        result = result.withClosingBehavior(closingBehavior);
+      }
+      if (outputTimeFn != null) {
+        result = result.withOutputTimeFn(outputTimeFn);
+      }
+      return result;
     }
   }
 
