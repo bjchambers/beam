@@ -134,8 +134,9 @@ public class LateDataDroppingDoFnRunner<K, InputT, OutputT, W extends BoundedWin
           // The element is too late for this window.
           droppedDueToLateness.inc();
           WindowTracing.debug(
-              "ReduceFnRunner.processElement: Dropping element at {} for key:{}; window:{} "
+              "{}: Dropping element at {} for key:{}; window:{} "
               + "since too far behind inputWatermark:{}; outputWatermark:{}",
+              LateDataFilter.class.getSimpleName(),
               input.getTimestamp(), key, window, timerInternals.currentInputWatermarkTime(),
               timerInternals.currentOutputWatermarkTime());
         }
@@ -147,11 +148,7 @@ public class LateDataDroppingDoFnRunner<K, InputT, OutputT, W extends BoundedWin
             @Override
             public boolean apply(WindowedValue<InputT> input) {
               BoundedWindow window = Iterables.getOnlyElement(input.getWindows());
-              if (canDropDueToExpiredWindow(window)) {
-                return false;
-              } else {
-                return true;
-              }
+              return !canDropDueToExpiredWindow(window);
             }
           });
       return nonLateElements;
