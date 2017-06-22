@@ -278,7 +278,9 @@ public class ReduceFnRunnerTest {
     assertThat(
         tester.extractOutput(),
         contains(
-            isSingleWindowedValue(equalTo(7), 2, 0, 100)));
+            isSingleWindowedValue(equalTo(7), 2, 0, 100),
+            // Where does this window come from?
+            isSingleWindowedValue(equalTo(0), 99, 0, 100)));
   }
 
   /**
